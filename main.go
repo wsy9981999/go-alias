@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 
+	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/os/gcmd"
 	"github.com/gogf/gf/v2/os/gctx"
 	"github.com/gogf/gf/v2/os/gfile"
 	"github.com/gogf/gf/v2/os/gproc"
@@ -34,29 +36,58 @@ func main(){
 
 func main() {
 	if len(os.Args) < 3 {
-		log.Fatal("usage:alias [name] [value]")
+		log.Fatal("usage:alias `name` `value` [-r]")
 	}
-	name := os.Args[1]
-	value := os.Args[2]
+
+	p, err := gcmd.Parse(g.MapStrBool{
+		"r,remove": false,
+	})
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	name := p.GetArg(1).String()
+	value := p.GetArg(2).String()
 
 	newContent := gstr.Replace(content, "{{value}}", value)
 	path := gfile.Join(gfile.SelfDir(), "src", name)
 	if err := gfile.Mkdir(path); err != nil {
 		log.Fatal(err.Error())
 	}
+	ctx := gctx.GetInitCtx()
+	g.Log().Info(ctx, "start write main.go")
 	if err := gfile.PutContents(gfile.Join(path, "main.go"), newContent); err != nil {
 		log.Fatal(err.Error())
 	}
+	g.Log().Info(ctx, "write success")
+	g.Log().Info(ctx, "start run `go mod init`")
 	if err := run(gctx.GetInitCtx(), "go mod init "+name, path); err != nil {
 		log.Fatal(err.Error())
 	}
+	g.Log().Info(ctx, "run success")
+
+	g.Log().Info(ctx, "start run `go mod tidy`")
 	if err := run(gctx.GetInitCtx(), "go mod tidy", path); err != nil {
 		log.Fatal(err.Error())
 	}
+	g.Log().Info(ctx, "run success")
+
+	g.Log().Info(ctx, "start run `go intall`")
 	if err := run(gctx.GetInitCtx(), "go install", path); err != nil {
 		log.Fatal(err.Error())
 	}
+	g.Log().Info(ctx, "run success")
 
+	rm := p.GetOpt("remove")
+	if rm != nil {
+		g.Log().Info(ctx, "start remove src")
+		if err := gfile.Remove(path); err != nil {
+			log.Fatal(err.Error())
+
+		}
+		g.Log().Info(ctx, "remove success")
+
+	}
 }
 func run(ctx context.Context, command string, path string) error {
 	cmd := gproc.NewProcessCmd(command)
